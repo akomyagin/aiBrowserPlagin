@@ -1,0 +1,22 @@
+# Node
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Extension build artifacts
+*.zip
+*.crx
+*.xpi
+web-ext-artifacts/
+
+# Env / secrets
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store

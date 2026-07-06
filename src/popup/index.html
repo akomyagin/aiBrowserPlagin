@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Page Summarizer</title>
+    <style>
+      body {
+        width: 360px;
+        margin: 0;
+        padding: 12px;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+      }
+      button {
+        padding: 8px 12px;
+        cursor: pointer;
+      }
+      #summary {
+        margin-top: 12px;
+        white-space: pre-wrap;
+        line-height: 1.4;
+      }
+      .muted {
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="summarize">Summarize page</button>
+    <div id="summary" class="muted">Stage 0 skeleton — no logic yet.</div>
+    <script type="module" src="./popup.ts"></script>
+  </body>
+</html>
