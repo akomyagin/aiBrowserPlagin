@@ -13,6 +13,13 @@
     "default_title": "AI Page Summarizer",
     "default_popup": "popup.html"
   },
+
+  "sidebar_action": {
+    "default_panel": "popup.html",
+    "default_title": "AI Page Summarizer",
+    "open_at_install": false
+  },
+
   "background": {
     "scripts": ["background.js"],
     "type": "module"
