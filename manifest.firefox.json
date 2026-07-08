@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "AI Page Summarizer",
+  "description": "Summarize any web page with AI. BYOK — your API key stays in your browser.",
+  "version": "0.0.1",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ai-page-summarizer@akomyagin",
+      "strict_min_version": "109.0"
+    }
+  },
+  "action": {
+    "default_title": "AI Page Summarizer",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "scripts": ["background.js"],
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "contextMenus"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
