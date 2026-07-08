@@ -16,6 +16,11 @@
         padding: 8px 12px;
         cursor: pointer;
       }
+      #status {
+        margin-top: 8px;
+        color: #666;
+        min-height: 1.2em;
+      }
       #summary {
         margin-top: 12px;
         white-space: pre-wrap;
@@ -28,7 +33,8 @@
   </head>
   <body>
     <button id="summarize">Summarize page</button>
-    <div id="summary" class="muted">Stage 0 skeleton — no logic yet.</div>
+    <div id="status"></div>
+    <div id="summary" class="muted">Click “Summarize page” to begin.</div>
     <script type="module" src="./popup.ts"></script>
   </body>
 </html>

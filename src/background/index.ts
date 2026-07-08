@@ -1,15 +1,23 @@
 // Background service worker (Manifest V3).
 //
-// STAGE 0 SKELETON: wiring only, no summarization logic yet. Stage 1 fills in
-// the LLM call in summarize().
-//
 // Lifecycle note: an MV3 service worker is ephemeral — it is torn down when idle
 // and restarted on the next event. Never hold important state in module-level
 // variables expecting it to survive; persist to chrome.storage instead. Register
 // all listeners at the top level (synchronously), not inside async callbacks, so
 // they are attached on every worker wake-up.
+//
+// The actual LLM call lives in ./summarize.ts (testable, browser-API-free). This
+// module is the thin adapter: it reads BYOK settings from chrome.storage right
+// before the call, wires up an AbortController for timeout/cancellation, and maps
+// the outcome onto the typed SummarizeResult message.
 
 import type { ExtensionMessage, SummarizeResult } from "../lib/messages.ts";
+import { loadSettings } from "../lib/settings.ts";
+import { callLLM, TIMEOUT_MS } from "./summarize.ts";
+
+// Transient handle to the in-flight request's controller. Not durable state —
+// only meaningful while the worker is alive handling one summarize call.
+let activeController: AbortController | null = null;
 
 chrome.runtime.onInstalled.addListener(() => {
   console.info("[bg] AI Page Summarizer installed");
@@ -19,7 +27,7 @@ chrome.runtime.onMessage.addListener(
   (message: ExtensionMessage, _sender, sendResponse) => {
     if (message.type === "SUMMARIZE") {
       // Async work + sendResponse => must return true to keep the channel open.
-      summarize(message.text)
+      summarize(message.text, message.url, message.title)
         .then((summary) => {
           const res: SummarizeResult = {
             type: "SUMMARIZE_RESULT",
@@ -42,8 +50,27 @@ chrome.runtime.onMessage.addListener(
   },
 );
 
-// Placeholder for Stage 1: call the configured OpenAI-compatible endpoint.
-// Reads BYOK settings from chrome.storage; the key never leaves runtime storage.
-async function summarize(text: string): Promise<string> {
-  return `TODO(stage 1): summarize ${text.length} chars via LLM`;
+// Reads BYOK settings from chrome.storage; the key never leaves runtime storage
+// and is never logged.
+async function summarize(
+  text: string,
+  url: string | undefined,
+  title: string | undefined,
+): Promise<string> {
+  const settings = await loadSettings();
+
+  // Abort any prior in-flight request (worker may still be alive from a rapid
+  // second click) before starting a new one.
+  activeController?.abort();
+
+  const controller = new AbortController();
+  activeController = controller;
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  try {
+    return await callLLM(text, url, title, settings, controller.signal);
+  } finally {
+    clearTimeout(timeout);
+    activeController = null;
+  }
 }
