@@ -17,15 +17,55 @@ import type {
   CancelRequest,
   ExtractRequest,
   ExtractResult,
+  PageLink,
   SummarizeRequest,
   SummarizeResult,
 } from "../lib/messages.ts";
-import { loadSettings, saveSettings } from "../lib/settings.ts";
+import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "../lib/settings.ts";
 
 const button = document.getElementById("summarize") as HTMLButtonElement;
 const cancelBtn = document.getElementById("cancel") as HTMLButtonElement;
 const status = document.getElementById("status") as HTMLDivElement;
 const output = document.getElementById("summary") as HTMLDivElement;
+
+// Render the summary into the output area, turning Markdown [text](url) links
+// into clickable anchors that open in a background tab. We build DOM nodes
+// manually (no innerHTML) so untrusted LLM output can never inject markup.
+function renderSummary(text: string): void {
+  output.textContent = ""; // clear
+  const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
+  const lines = text.split("\n");
+  for (const line of lines) {
+    const p = document.createElement("div");
+    let lastIdx = 0;
+    let match: RegExpExecArray | null;
+    linkRegex.lastIndex = 0;
+    while ((match = linkRegex.exec(line)) !== null) {
+      if (match.index > lastIdx) {
+        p.appendChild(document.createTextNode(line.slice(lastIdx, match.index)));
+      }
+      const a = document.createElement("a");
+      a.textContent = match[1];
+      a.href = "#";
+      a.dataset["href"] = match[2];
+      a.className = "summary-link";
+      p.appendChild(a);
+      lastIdx = match.index + match[0].length;
+    }
+    if (lastIdx < line.length) {
+      p.appendChild(document.createTextNode(line.slice(lastIdx)));
+    }
+    output.appendChild(p);
+    output.appendChild(document.createElement("br"));
+  }
+  output.querySelectorAll("a.summary-link").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      const href = (el as HTMLElement).dataset["href"];
+      if (href) void chrome.tabs.create({ url: href, active: false });
+    });
+  });
+}
 
 /** Set the status line, toggling the animated-ellipsis loading class. */
 function setStatus(text: string): void {
@@ -137,18 +177,15 @@ function showView(v: "main" | "settings"): void {
 }
 
 async function handleSave(): Promise<void> {
-  const baseUrl = baseUrlInput.value.trim();
-  const model = modelInput.value.trim();
+  const rawUrl = baseUrlInput.value.trim();
+  const baseUrl = rawUrl === "" ? DEFAULT_SETTINGS.baseUrl : rawUrl;
+  const model = modelInput.value.trim() || DEFAULT_SETTINGS.model;
   const keyEntry = apiKeyInput.value.trim();
 
   try {
     new URL(baseUrl);
   } catch {
     sStatus.textContent = "Invalid Base URL.";
-    return;
-  }
-  if (model === "") {
-    sStatus.textContent = "Model must not be empty.";
     return;
   }
 
@@ -218,7 +255,13 @@ async function handleSummarize(): Promise<void> {
 
     // Delegate the LLM call + result rendering to the shared helper. It also
     // manages button/cancel/status, so reset them below is harmless.
-    await handleSummarizeText(extracted.text, extracted.url, extracted.title, "page");
+    await handleSummarizeText(
+      extracted.text,
+      extracted.url,
+      extracted.title,
+      "page",
+      extracted.links,
+    );
   } catch (err: unknown) {
     if (!wasCancelled) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -245,6 +288,7 @@ async function handleSummarizeText(
   url: string,
   title: string,
   source: "page" | "selection" = "selection",
+  links?: PageLink[],
 ): Promise<void> {
   wasCancelled = false;
   button.disabled = true;
@@ -270,6 +314,7 @@ async function handleSummarizeText(
       text,
       url,
       title,
+      links,
     };
     const result = (await chrome.runtime.sendMessage(
       summarizeReq,
@@ -277,9 +322,11 @@ async function handleSummarizeText(
 
     if (!wasCancelled) {
       setStatus("");
-      output.textContent = result.ok
-        ? (result.summary ?? "")
-        : `Error: ${result.error}`;
+      if (result.ok) {
+        renderSummary(result.summary ?? "");
+      } else {
+        output.textContent = `Error: ${result.error}`;
+      }
     }
   } catch (err: unknown) {
     if (!wasCancelled) {

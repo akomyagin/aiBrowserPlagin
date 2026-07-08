@@ -11,9 +11,31 @@ import { Readability } from "@mozilla/readability";
 // itself is loaded lazily (dynamic import) inside extractPdfText() so the
 // non-PDF path and jsdom unit tests never pull in its DOMMatrix-dependent runtime.
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import type { PageLink } from "../lib/messages.ts";
+
+export type { PageLink };
 
 export function getSelectionText(): string {
   return window.getSelection()?.toString().trim() ?? "";
+}
+
+// Harvest visible hyperlinks from the page so the LLM can cite article URLs in
+// its summary (Readability strips hrefs). Only absolute http(s) links with
+// meaningful anchor text are kept; duplicates are dropped and the list is capped
+// to fit the token budget.
+export function extractPageLinks(): PageLink[] {
+  const seen = new Set<string>();
+  const links: PageLink[] = [];
+  document.querySelectorAll("a[href]").forEach((el) => {
+    const anchor = el as HTMLAnchorElement;
+    const href = anchor.href; // already absolute
+    const text = anchor.textContent?.trim() ?? "";
+    if (!href.startsWith("http") || !text || text.length < 10 || seen.has(href))
+      return;
+    seen.add(href);
+    links.push({ text, href });
+  });
+  return links.slice(0, 30); // cap at 30 to fit token budget
 }
 
 // Extract readable main content via Readability, stripping nav/ads/boilerplate.

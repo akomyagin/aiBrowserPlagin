@@ -9,6 +9,7 @@
 // only in the Authorization header. It is NEVER logged (no console.*), not even
 // partially.
 
+import type { PageLink } from "../lib/messages.ts";
 import type { Settings } from "../lib/settings.ts";
 
 /** Hard cap on characters sent to the LLM (rough token-budget guard). */
@@ -53,7 +54,9 @@ export function httpErrorMessage(status: number, statusText: string): string {
 const SYSTEM_PROMPT =
   "You are a helpful assistant. Summarize the web page content concisely " +
   "(3-5 bullet points or 2-3 short paragraphs). Respond in the same language " +
-  "as the content.";
+  "as the content. When summarizing pages that list articles or posts, include " +
+  "the relevant URL as a Markdown link [title](url) using the URLs provided in " +
+  "'Links on this page'. Only link to URLs that were explicitly provided.";
 
 /**
  * Call an OpenAI-compatible /chat/completions endpoint and return the summary.
@@ -65,12 +68,19 @@ export async function callLLM(
   title: string | undefined,
   settings: Settings,
   signal: AbortSignal,
+  links?: PageLink[],
 ): Promise<string> {
   if (settings.apiKey === "") {
     throw new Error("API key not configured. Open extension settings (⚙).");
   }
 
-  const content = truncateText([title, url, text].filter(Boolean).join("\n"));
+  const linksSection = links?.length
+    ? "\n\nLinks on this page:\n" +
+      links.map((l) => `- ${l.text}: ${l.href}`).join("\n")
+    : "";
+  const content = truncateText(
+    [title, url, text].filter(Boolean).join("\n") + linksSection,
+  );
   const messages = [
     { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content },

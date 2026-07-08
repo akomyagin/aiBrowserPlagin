@@ -4,6 +4,12 @@
 
 export type ExtractSource = "page" | "selection";
 
+/** A hyperlink extracted from the page, used to let the LLM cite article URLs. */
+export interface PageLink {
+  text: string;
+  href: string;
+}
+
 /** popup/content -> background: please summarize this text. */
 export interface SummarizeRequest {
   type: "SUMMARIZE";
@@ -11,6 +17,7 @@ export interface SummarizeRequest {
   text: string;
   url?: string;
   title?: string;
+  links?: PageLink[];
 }
 
 /** background -> popup: content script -> popup extraction result. */
@@ -26,6 +33,8 @@ export interface ExtractResult {
   title: string;
   /** Set when extraction failed (e.g. a PDF that pdf.js could not parse). */
   error?: string;
+  /** Hyperlinks harvested from the page (capped), for LLM citation. */
+  links?: PageLink[];
 }
 
 /** background -> caller: summary result or error. */

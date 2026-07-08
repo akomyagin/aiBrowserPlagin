@@ -9,6 +9,7 @@
 
 import type { ExtensionMessage, ExtractResult } from "../lib/messages.ts";
 import {
+  extractPageLinks,
   extractPageText,
   extractPdfText,
   getSelectionText,
@@ -51,6 +52,7 @@ chrome.runtime.onMessage.addListener(
         text,
         url: location.href,
         title: document.title,
+        links: message.source === "page" ? extractPageLinks() : undefined,
       };
       sendResponse(res);
     }
