@@ -193,6 +193,36 @@ describe("callLLM", () => {
     ).rejects.toThrow("Unexpected API response format");
   });
 
+  it("appends provided links to the content sent to the LLM", async () => {
+    const fetchMock = vi.mocked(globalThis.fetch).mockResolvedValue(
+      okResponse("summary"),
+    );
+    await callLLM("body text", "https://x.test", "Title", validSettings, neverAbort, [
+      { text: "Article One", href: "https://x.test/a1" },
+      { text: "Article Two", href: "https://x.test/a2" },
+    ]);
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(init.body as string) as {
+      messages: { role: string; content: string }[];
+    };
+    const userContent = body.messages[1].content;
+    expect(userContent).toContain("Links on this page:");
+    expect(userContent).toContain("- Article One: https://x.test/a1");
+    expect(userContent).toContain("- Article Two: https://x.test/a2");
+  });
+
+  it("omits the links section when no links are provided", async () => {
+    const fetchMock = vi.mocked(globalThis.fetch).mockResolvedValue(
+      okResponse("summary"),
+    );
+    await callLLM("body text", "https://x.test", "Title", validSettings, neverAbort);
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(init.body as string) as {
+      messages: { role: string; content: string }[];
+    };
+    expect(body.messages[1].content).not.toContain("Links on this page:");
+  });
+
   it("throws on unexpected API response format (choices missing)", async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,

@@ -15,6 +15,7 @@ import type {
   ExtensionMessage,
   ExtractRequest,
   ExtractResult,
+  PageLink,
   SummarizeResult,
 } from "../lib/messages.ts";
 import { loadSettings } from "../lib/settings.ts";
@@ -77,7 +78,7 @@ chrome.runtime.onMessage.addListener(
   (message: ExtensionMessage, _sender, sendResponse) => {
     if (message.type === "SUMMARIZE") {
       // Async work + sendResponse => must return true to keep the channel open.
-      summarize(message.text, message.url, message.title)
+      summarize(message.text, message.url, message.title, message.links)
         .then((summary) => {
           const res: SummarizeResult = {
             type: "SUMMARIZE_RESULT",
@@ -112,6 +113,7 @@ async function summarize(
   text: string,
   url: string | undefined,
   title: string | undefined,
+  links?: PageLink[],
 ): Promise<string> {
   const settings = await loadSettings();
 
@@ -124,7 +126,7 @@ async function summarize(
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    return await callLLM(text, url, title, settings, controller.signal);
+    return await callLLM(text, url, title, settings, controller.signal, links);
   } finally {
     clearTimeout(timeout);
     activeController = null;
