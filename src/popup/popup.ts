@@ -20,7 +20,7 @@ import type {
   SummarizeRequest,
   SummarizeResult,
 } from "../lib/messages.ts";
-import { loadSettings, saveSettings } from "../lib/settings.ts";
+import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "../lib/settings.ts";
 
 const button = document.getElementById("summarize") as HTMLButtonElement;
 const cancelBtn = document.getElementById("cancel") as HTMLButtonElement;
@@ -137,18 +137,15 @@ function showView(v: "main" | "settings"): void {
 }
 
 async function handleSave(): Promise<void> {
-  const baseUrl = baseUrlInput.value.trim();
-  const model = modelInput.value.trim();
+  const rawUrl = baseUrlInput.value.trim();
+  const baseUrl = rawUrl === "" ? DEFAULT_SETTINGS.baseUrl : rawUrl;
+  const model = modelInput.value.trim() || DEFAULT_SETTINGS.model;
   const keyEntry = apiKeyInput.value.trim();
 
   try {
     new URL(baseUrl);
   } catch {
     sStatus.textContent = "Invalid Base URL.";
-    return;
-  }
-  if (model === "") {
-    sStatus.textContent = "Model must not be empty.";
     return;
   }
 
