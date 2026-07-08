@@ -8,11 +8,40 @@
 // text, hand it to the background worker, never put secrets here.
 
 import type { ExtensionMessage, ExtractResult } from "../lib/messages.ts";
-import { extractPageText, getSelectionText } from "./extract.ts";
+import {
+  extractPageText,
+  extractPdfText,
+  getSelectionText,
+  isPdfPage,
+} from "./extract.ts";
 
 chrome.runtime.onMessage.addListener(
   (message: ExtensionMessage, _sender, sendResponse) => {
     if (message.type === "EXTRACT") {
+      // PDF extraction is async (pdf.js). Keep the message channel open by
+      // returning true and calling sendResponse from the promise.
+      if (message.source === "page" && isPdfPage()) {
+        extractPdfText()
+          .then((text) => {
+            sendResponse({
+              type: "EXTRACT_RESULT",
+              text,
+              url: location.href,
+              title: document.title,
+            } satisfies ExtractResult);
+          })
+          .catch((err: unknown) => {
+            sendResponse({
+              type: "EXTRACT_RESULT",
+              text: "",
+              url: location.href,
+              title: document.title,
+              error: String(err),
+            } satisfies ExtractResult);
+          });
+        return true; // keep channel open for async sendResponse
+      }
+
       const text =
         message.source === "selection"
           ? getSelectionText()

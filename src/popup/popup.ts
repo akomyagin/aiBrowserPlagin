@@ -196,6 +196,12 @@ async function handleSummarize(): Promise<void> {
       extractReq,
     )) as ExtractResult;
 
+    if (extracted.error) {
+      setStatus("");
+      output.textContent = `Error reading page: ${extracted.error}`;
+      return;
+    }
+
     setStatus("Summarizing");
 
     const summarizeReq: SummarizeRequest = {
