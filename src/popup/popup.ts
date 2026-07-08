@@ -14,6 +14,7 @@
 // the key is never logged.
 
 import type {
+  CancelRequest,
   ExtractRequest,
   ExtractResult,
   SummarizeRequest,
@@ -22,8 +23,15 @@ import type {
 import { loadSettings, saveSettings } from "../lib/settings.ts";
 
 const button = document.getElementById("summarize") as HTMLButtonElement;
+const cancelBtn = document.getElementById("cancel") as HTMLButtonElement;
 const status = document.getElementById("status") as HTMLDivElement;
 const output = document.getElementById("summary") as HTMLDivElement;
+
+/** Set the status line, toggling the animated-ellipsis loading class. */
+function setStatus(text: string): void {
+  status.textContent = text;
+  status.classList.toggle("loading", text.length > 0);
+}
 
 const mainView = document.getElementById("main-view") as HTMLDivElement;
 const settingsView = document.getElementById("settings-view") as HTMLDivElement;
@@ -43,9 +51,21 @@ const NO_KEY_MESSAGE = "No API key configured. Click ⚙ to open Settings.";
 
 let showingNoKeyWarning = false;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let wasCancelled = false;
 
 button.addEventListener("click", () => {
   void handleSummarize();
+});
+cancelBtn.addEventListener("click", () => {
+  wasCancelled = true;
+  void chrome.runtime.sendMessage({
+    type: "CANCEL_SUMMARIZE",
+  } satisfies CancelRequest);
+  cancelBtn.hidden = true;
+  button.disabled = false;
+  setStatus("");
+  output.textContent = "Cancelled.";
+  showingNoKeyWarning = false;
 });
 settingsToggle.addEventListener("click", () => {
   void showView("settings");
@@ -142,8 +162,10 @@ async function handleSave(): Promise<void> {
 }
 
 async function handleSummarize(): Promise<void> {
+  wasCancelled = false;
   button.disabled = true;
-  status.textContent = "Extracting…";
+  cancelBtn.hidden = false;
+  setStatus("Extracting");
   output.textContent = "";
   output.classList.remove("muted");
   showingNoKeyWarning = false;
@@ -151,7 +173,7 @@ async function handleSummarize(): Promise<void> {
   try {
     const s = await loadSettings();
     if (!s.apiKey) {
-      status.textContent = "";
+      setStatus("");
       output.textContent = NO_KEY_MESSAGE;
       output.classList.add("muted");
       showingNoKeyWarning = true;
@@ -163,7 +185,7 @@ async function handleSummarize(): Promise<void> {
       currentWindow: true,
     });
     if (!tab.id) {
-      status.textContent = "";
+      setStatus("");
       output.textContent = "No active tab.";
       return;
     }
@@ -174,7 +196,7 @@ async function handleSummarize(): Promise<void> {
       extractReq,
     )) as ExtractResult;
 
-    status.textContent = "Summarizing…";
+    setStatus("Summarizing");
 
     const summarizeReq: SummarizeRequest = {
       type: "SUMMARIZE",
@@ -187,21 +209,27 @@ async function handleSummarize(): Promise<void> {
       summarizeReq,
     )) as SummarizeResult;
 
-    status.textContent = "";
-    output.textContent = result.ok
-      ? (result.summary ?? "")
-      : `Error: ${result.error}`;
+    if (!wasCancelled) {
+      setStatus("");
+      output.textContent = result.ok
+        ? (result.summary ?? "")
+        : `Error: ${result.error}`;
+    }
   } catch (err: unknown) {
-    status.textContent = "";
-    const msg = err instanceof Error ? err.message : String(err);
-    const isMissingContentScript =
-      msg.includes("Could not establish connection") ||
-      msg.includes("Receiving end does not exist");
-    output.textContent = isMissingContentScript
-      ? "This extension cannot summarize browser pages (chrome://, about:, extension pages)."
-      : `Error: ${msg}`;
+    if (!wasCancelled) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isMissingContentScript =
+        msg.includes("Could not establish connection") ||
+        msg.includes("Receiving end does not exist");
+      output.textContent = isMissingContentScript
+        ? "This extension cannot summarize browser pages (chrome://, about:, extension pages)."
+        : `Error: ${msg}`;
+    }
   } finally {
     button.disabled = false;
+    cancelBtn.hidden = true;
+    setStatus("");
+    wasCancelled = false;
   }
 }
 

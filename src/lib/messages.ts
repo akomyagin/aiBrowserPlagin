@@ -34,8 +34,14 @@ export interface SummarizeResult {
   error?: string;
 }
 
+/** popup -> background: abort the in-flight summarize request. */
+export interface CancelRequest {
+  type: "CANCEL_SUMMARIZE";
+}
+
 export type ExtensionMessage =
   | SummarizeRequest
   | ExtractRequest
   | ExtractResult
-  | SummarizeResult;
+  | SummarizeResult
+  | CancelRequest;

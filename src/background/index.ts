@@ -46,6 +46,12 @@ chrome.runtime.onMessage.addListener(
         });
       return true;
     }
+    if (message.type === "CANCEL_SUMMARIZE") {
+      // Synchronous handler: abort the in-flight request, if any.
+      activeController?.abort();
+      activeController = null;
+      return undefined;
+    }
     return undefined;
   },
 );
