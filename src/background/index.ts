@@ -36,7 +36,12 @@ chrome.runtime.onInstalled.addListener(() => {
   });
   // Stage 6: keep the popup as the default action-click behavior. The side panel
   // (same HTML page) is opened manually by the user via Chrome's side-panel icon.
-  void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+  // Firefox has no Side Panel API, so `chrome.sidePanel` is undefined there —
+  // guard with optional chaining (the @types/chrome type isn't optional, hence
+  // the cast) so the background script doesn't crash on load in Firefox.
+  void (
+    chrome as { sidePanel?: typeof chrome.sidePanel }
+  ).sidePanel?.setPanelBehavior({ openPanelOnActionClick: false });
 });
 
 // Right-click "Summarize selection". An MV3 background worker cannot open the
