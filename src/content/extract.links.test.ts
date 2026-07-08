@@ -39,13 +39,13 @@ describe("extractPageLinks", () => {
     expect(extractPageLinks()).toHaveLength(0);
   });
 
-  it("caps the result at 30 links", () => {
-    document.body.innerHTML = Array.from({ length: 40 })
+  it("caps the result at 60 links", () => {
+    document.body.innerHTML = Array.from({ length: 70 })
       .map(
         (_, i) =>
           `<a href="https://example.com/article-${i}">Long enough title ${i}</a>`,
       )
       .join("");
-    expect(extractPageLinks()).toHaveLength(30);
+    expect(extractPageLinks()).toHaveLength(60);
   });
 });
