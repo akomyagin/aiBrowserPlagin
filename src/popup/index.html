@@ -6,7 +6,7 @@
     <title>AI Page Summarizer</title>
     <style>
       body {
-        width: 360px;
+        width: 320px;
         margin: 0;
         padding: 12px;
         font-family: system-ui, sans-serif;
@@ -16,7 +16,12 @@
         padding: 8px 12px;
         cursor: pointer;
       }
-      #status {
+      .toolbar {
+        display: flex;
+        gap: 8px;
+      }
+      #status,
+      #s-status {
         margin-top: 8px;
         color: #666;
         min-height: 1.2em;
@@ -29,12 +34,58 @@
       .muted {
         color: #666;
       }
+      h3 {
+        margin: 0 0 8px;
+      }
+      label {
+        display: block;
+        margin: 8px 0;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        margin-top: 4px;
+        padding: 6px;
+      }
+      .settings-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
     </style>
   </head>
   <body>
-    <button id="summarize">Summarize page</button>
-    <div id="status"></div>
-    <div id="summary" class="muted">Click “Summarize page” to begin.</div>
+    <!-- Main view -->
+    <div id="main-view">
+      <div class="toolbar">
+        <button id="summarize">Summarize page</button>
+        <button id="settings-toggle" title="Settings">⚙</button>
+      </div>
+      <div id="status"></div>
+      <div id="summary" class="muted">Click “Summarize page” to begin.</div>
+    </div>
+
+    <!-- Settings view (hidden initially) -->
+    <div id="settings-view" hidden>
+      <h3>Settings</h3>
+      <label>
+        Base URL
+        <input id="s-base-url" type="url" placeholder="https://api.openai.com/v1" />
+      </label>
+      <label>
+        API Key
+        <input id="s-api-key" type="password" autocomplete="off" placeholder="Enter new key to change" />
+      </label>
+      <label>
+        Model
+        <input id="s-model" type="text" placeholder="gpt-4o-mini" />
+      </label>
+      <div class="settings-actions">
+        <button id="s-save">Save</button>
+        <button id="s-back">Back</button>
+      </div>
+      <div id="s-status"></div>
+    </div>
     <script type="module" src="./popup.ts"></script>
   </body>
 </html>
