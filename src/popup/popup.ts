@@ -269,7 +269,8 @@ async function handleSummarize(): Promise<void> {
         msg.includes("Could not establish connection") ||
         msg.includes("Receiving end does not exist");
       output.textContent = isMissingContentScript
-        ? "This extension cannot summarize browser pages (chrome://, about:, extension pages)."
+        ? "Could not connect to the page. Try refreshing the tab (F5), then click Summarize again. " +
+          "Note: chrome://, about: and extension pages cannot be summarized."
         : `Error: ${msg}`;
     }
   } finally {
