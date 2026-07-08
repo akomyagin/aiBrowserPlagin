@@ -32,6 +32,7 @@ export default defineManifest({
     "activeTab", // read the current tab's content on user action
     "storage", // persist BYOK settings via chrome.storage
     "scripting", // programmatic injection fallback
+    "contextMenus", // "Summarize selection" right-click entry (Stage 5)
   ],
 
   // The pdf.js worker is imported via Vite `?url` and emitted into assets/. MV3

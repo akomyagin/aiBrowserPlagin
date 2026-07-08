@@ -102,6 +102,23 @@ async function init(): Promise<void> {
     output.classList.add("muted");
     showingNoKeyWarning = true;
   }
+
+  // Selection summarization is triggered from the context menu (Stage 5). The
+  // background worker stashes the selected text here; pick it up, clear the key,
+  // and run the summarize flow directly (the EXTRACT step already happened).
+  const session = (await chrome.storage.session.get("pendingSelection")) as {
+    pendingSelection?: { text: string; url: string; title: string };
+  };
+  if (session.pendingSelection) {
+    const pending = session.pendingSelection;
+    await chrome.storage.session.remove("pendingSelection");
+    if (pending.text.trim() === "") {
+      output.textContent = "No text selected.";
+      output.classList.remove("muted");
+      return;
+    }
+    void handleSummarizeText(pending.text, pending.url, pending.title);
+  }
 }
 
 function showView(v: "main" | "settings"): void {
@@ -173,7 +190,6 @@ async function handleSummarize(): Promise<void> {
   try {
     const s = await loadSettings();
     if (!s.apiKey) {
-      setStatus("");
       output.textContent = NO_KEY_MESSAGE;
       output.classList.add("muted");
       showingNoKeyWarning = true;
@@ -185,7 +201,6 @@ async function handleSummarize(): Promise<void> {
       currentWindow: true,
     });
     if (!tab.id) {
-      setStatus("");
       output.textContent = "No active tab.";
       return;
     }
@@ -197,8 +212,53 @@ async function handleSummarize(): Promise<void> {
     )) as ExtractResult;
 
     if (extracted.error) {
-      setStatus("");
       output.textContent = `Error reading page: ${extracted.error}`;
+      return;
+    }
+
+    // Delegate the LLM call + result rendering to the shared helper. It also
+    // manages button/cancel/status, so reset them below is harmless.
+    await handleSummarizeText(extracted.text, extracted.url, extracted.title, "page");
+  } catch (err: unknown) {
+    if (!wasCancelled) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isMissingContentScript =
+        msg.includes("Could not establish connection") ||
+        msg.includes("Receiving end does not exist");
+      output.textContent = isMissingContentScript
+        ? "This extension cannot summarize browser pages (chrome://, about:, extension pages)."
+        : `Error: ${msg}`;
+    }
+  } finally {
+    button.disabled = false;
+    cancelBtn.hidden = true;
+    setStatus("");
+    wasCancelled = false;
+  }
+}
+
+// Shared LLM call: forwards text to the background worker and renders the
+// result. Used by both the page-button flow and the context-menu selection
+// flow. Manages the button/cancel UI state itself so callers don't duplicate it.
+async function handleSummarizeText(
+  text: string,
+  url: string,
+  title: string,
+  source: "page" | "selection" = "selection",
+): Promise<void> {
+  wasCancelled = false;
+  button.disabled = true;
+  cancelBtn.hidden = false;
+  output.classList.remove("muted");
+  showingNoKeyWarning = false;
+
+  try {
+    const s = await loadSettings();
+    if (!s.apiKey) {
+      setStatus("");
+      output.textContent = NO_KEY_MESSAGE;
+      output.classList.add("muted");
+      showingNoKeyWarning = true;
       return;
     }
 
@@ -206,10 +266,10 @@ async function handleSummarize(): Promise<void> {
 
     const summarizeReq: SummarizeRequest = {
       type: "SUMMARIZE",
-      source: "page",
-      text: extracted.text,
-      url: extracted.url,
-      title: extracted.title,
+      source,
+      text,
+      url,
+      title,
     };
     const result = (await chrome.runtime.sendMessage(
       summarizeReq,
@@ -224,12 +284,7 @@ async function handleSummarize(): Promise<void> {
   } catch (err: unknown) {
     if (!wasCancelled) {
       const msg = err instanceof Error ? err.message : String(err);
-      const isMissingContentScript =
-        msg.includes("Could not establish connection") ||
-        msg.includes("Receiving end does not exist");
-      output.textContent = isMissingContentScript
-        ? "This extension cannot summarize browser pages (chrome://, about:, extension pages)."
-        : `Error: ${msg}`;
+      output.textContent = `Error: ${msg}`;
     }
   } finally {
     button.disabled = false;

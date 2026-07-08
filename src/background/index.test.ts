@@ -42,6 +42,10 @@ beforeEach(async () => {
         }),
       },
     },
+    contextMenus: {
+      create: vi.fn(),
+      onClicked: { addListener: vi.fn() },
+    },
     storage: {
       local: {
         get: vi.fn(async () => ({})),

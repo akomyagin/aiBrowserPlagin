@@ -11,9 +11,16 @@
 // before the call, wires up an AbortController for timeout/cancellation, and maps
 // the outcome onto the typed SummarizeResult message.
 
-import type { ExtensionMessage, SummarizeResult } from "../lib/messages.ts";
+import type {
+  ExtensionMessage,
+  ExtractRequest,
+  ExtractResult,
+  SummarizeResult,
+} from "../lib/messages.ts";
 import { loadSettings } from "../lib/settings.ts";
 import { callLLM, TIMEOUT_MS } from "./summarize.ts";
+
+const CONTEXT_MENU_ID = "summarize-selection";
 
 // Transient handle to the in-flight request's controller. Not durable state —
 // only meaningful while the worker is alive handling one summarize call.
@@ -21,7 +28,47 @@ let activeController: AbortController | null = null;
 
 chrome.runtime.onInstalled.addListener(() => {
   console.info("[bg] AI Page Summarizer installed");
+  chrome.contextMenus.create({
+    id: CONTEXT_MENU_ID,
+    title: "Summarize selection",
+    contexts: ["selection"],
+  });
 });
+
+// Right-click "Summarize selection". An MV3 background worker cannot open the
+// popup directly, so instead of opening it we ask the content script for the
+// selected text and stash it in chrome.storage.session under `pendingSelection`.
+// When the user opens the popup, its init() picks up that key and runs the
+// summarize flow (see popup.ts). Registered synchronously at top level so it is
+// re-attached on every worker wake-up.
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId !== CONTEXT_MENU_ID || !tab?.id) return;
+  void handleContextMenuClick(tab.id);
+});
+
+async function handleContextMenuClick(tabId: number): Promise<void> {
+  const extractReq: ExtractRequest = { type: "EXTRACT", source: "selection" };
+  try {
+    const extracted = (await chrome.tabs.sendMessage(
+      tabId,
+      extractReq,
+    )) as ExtractResult;
+    await chrome.storage.session.set({
+      pendingSelection: {
+        text: extracted.text,
+        url: extracted.url,
+        title: extracted.title,
+      },
+    });
+  } catch (err: unknown) {
+    // Content script unreachable (chrome://, extension pages). Persist an empty
+    // selection so the popup can surface a friendly message rather than hang.
+    console.warn("[bg] selection extract failed:", err);
+    await chrome.storage.session.set({
+      pendingSelection: { text: "", url: "", title: "" },
+    });
+  }
+}
 
 chrome.runtime.onMessage.addListener(
   (message: ExtensionMessage, _sender, sendResponse) => {
