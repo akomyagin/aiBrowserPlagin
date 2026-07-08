@@ -34,6 +34,16 @@ export default defineManifest({
     "scripting", // programmatic injection fallback
   ],
 
+  // The pdf.js worker is imported via Vite `?url` and emitted into assets/. MV3
+  // requires it to be web-accessible so the content script's worker can load it
+  // (a glob covers @crxjs/Vite hashing the filename).
+  web_accessible_resources: [
+    {
+      resources: ["assets/*.js", "assets/*.mjs"],
+      matches: ["<all_urls>"],
+    },
+  ],
+
   // host_permissions is intentionally left to activeTab for Phase 1 to keep the
   // privacy footprint minimal. The LLM endpoint is reached from the service
   // worker via fetch(); the user's configured base URL does not need a static

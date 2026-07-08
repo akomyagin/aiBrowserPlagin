@@ -24,6 +24,8 @@ export interface ExtractResult {
   text: string;
   url: string;
   title: string;
+  /** Set when extraction failed (e.g. a PDF that pdf.js could not parse). */
+  error?: string;
 }
 
 /** background -> caller: summary result or error. */
