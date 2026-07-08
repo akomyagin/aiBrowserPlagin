@@ -1,13 +1,17 @@
 // Popup UI (Manifest V3).
 //
 // STAGE 0 SKELETON: plain TypeScript, no framework. Justification: the popup is a
-// tiny surface (one button, a result area, a small settings form later). React
-// would add bundle weight and build complexity for near-zero benefit at MVP
-// scope. If the side panel (Phase 2) grows into a richer UI, revisit then.
+// tiny surface (one button, a result area, a small settings form). React would
+// add bundle weight and build complexity for near-zero benefit at MVP scope. If
+// the side panel (Phase 2) grows into a richer UI, revisit then.
 //
 // Flow (wired in Stage 1): popup asks the active tab's content script to EXTRACT,
 // then forwards the text to the background worker for SUMMARIZE, then renders the
-// result. Stage 0 only proves the button + DOM wiring compile and load.
+// result. Stage 2 adds the BYOK settings view (base URL, API key, model).
+//
+// BYOK invariant: the API key input value is read only at save time and passed
+// straight to saveSettings; the field is never pre-filled with the stored key and
+// the key is never logged.
 
 import type {
   ExtractRequest,
@@ -15,22 +19,145 @@ import type {
   SummarizeRequest,
   SummarizeResult,
 } from "../lib/messages.ts";
+import { loadSettings, saveSettings } from "../lib/settings.ts";
 
 const button = document.getElementById("summarize") as HTMLButtonElement;
 const status = document.getElementById("status") as HTMLDivElement;
 const output = document.getElementById("summary") as HTMLDivElement;
 
+const mainView = document.getElementById("main-view") as HTMLDivElement;
+const settingsView = document.getElementById("settings-view") as HTMLDivElement;
+const settingsToggle = document.getElementById(
+  "settings-toggle",
+) as HTMLButtonElement;
+const saveBtn = document.getElementById("s-save") as HTMLButtonElement;
+const backBtn = document.getElementById("s-back") as HTMLButtonElement;
+const baseUrlInput = document.getElementById("s-base-url") as HTMLInputElement;
+const apiKeyInput = document.getElementById("s-api-key") as HTMLInputElement;
+const modelInput = document.getElementById("s-model") as HTMLInputElement;
+const sStatus = document.getElementById("s-status") as HTMLDivElement;
+
+const KEY_SAVED_PLACEHOLDER = "••••••• (saved, enter new to change)";
+const KEY_EMPTY_PLACEHOLDER = "sk-...";
+const NO_KEY_MESSAGE = "No API key configured. Click ⚙ to open Settings.";
+
+let showingNoKeyWarning = false;
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
 button.addEventListener("click", () => {
   void handleSummarize();
 });
+settingsToggle.addEventListener("click", () => {
+  void showView("settings");
+});
+backBtn.addEventListener("click", () => {
+  showView("main");
+});
+saveBtn.addEventListener("click", () => {
+  void handleSave();
+});
+
+/** Populate the settings fields from storage. Never fills the API key field. */
+async function fillSettingsFields(): Promise<void> {
+  const s = await loadSettings();
+  baseUrlInput.value = s.baseUrl;
+  modelInput.value = s.model;
+  apiKeyInput.value = "";
+  apiKeyInput.placeholder = s.apiKey
+    ? KEY_SAVED_PLACEHOLDER
+    : KEY_EMPTY_PLACEHOLDER;
+}
+
+async function init(): Promise<void> {
+  const s = await loadSettings();
+  baseUrlInput.value = s.baseUrl;
+  modelInput.value = s.model;
+  apiKeyInput.value = "";
+  apiKeyInput.placeholder = s.apiKey
+    ? KEY_SAVED_PLACEHOLDER
+    : KEY_EMPTY_PLACEHOLDER;
+
+  if (s.apiKey === "") {
+    output.textContent = NO_KEY_MESSAGE;
+    output.classList.add("muted");
+    showingNoKeyWarning = true;
+  }
+}
+
+function showView(v: "main" | "settings"): void {
+  if (v === "settings" && saveTimer !== null) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  mainView.hidden = v !== "main";
+  settingsView.hidden = v !== "settings";
+  if (v === "settings") {
+    sStatus.textContent = "";
+    fillSettingsFields().catch(() => {
+      sStatus.textContent = "Failed to load settings.";
+    });
+  }
+}
+
+async function handleSave(): Promise<void> {
+  const baseUrl = baseUrlInput.value.trim();
+  const model = modelInput.value.trim();
+  const keyEntry = apiKeyInput.value.trim();
+
+  try {
+    new URL(baseUrl);
+  } catch {
+    sStatus.textContent = "Invalid Base URL.";
+    return;
+  }
+  if (model === "") {
+    sStatus.textContent = "Model must not be empty.";
+    return;
+  }
+
+  // Empty key field means "keep the existing key".
+  const existing = await loadSettings();
+  const apiKey = keyEntry === "" ? existing.apiKey : keyEntry;
+
+  await saveSettings({ baseUrl, apiKey, model });
+
+  apiKeyInput.value = "";
+  apiKeyInput.placeholder = apiKey
+    ? KEY_SAVED_PLACEHOLDER
+    : KEY_EMPTY_PLACEHOLDER;
+
+  // Clear the "no key" warning now that a key is configured.
+  if (apiKey && showingNoKeyWarning) {
+    output.textContent = 'Click "Summarize page" to begin.';
+    output.classList.add("muted");
+    showingNoKeyWarning = false;
+  }
+
+  sStatus.textContent = "Saved.";
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    sStatus.textContent = "";
+    showView("main");
+  }, 2000);
+}
 
 async function handleSummarize(): Promise<void> {
   button.disabled = true;
   status.textContent = "Extracting…";
   output.textContent = "";
   output.classList.remove("muted");
+  showingNoKeyWarning = false;
 
   try {
+    const s = await loadSettings();
+    if (!s.apiKey) {
+      status.textContent = "";
+      output.textContent = NO_KEY_MESSAGE;
+      output.classList.add("muted");
+      showingNoKeyWarning = true;
+      return;
+    }
+
     const [tab] = await chrome.tabs.query({
       active: true,
       currentWindow: true,
@@ -77,3 +204,5 @@ async function handleSummarize(): Promise<void> {
     button.disabled = false;
   }
 }
+
+void init();
