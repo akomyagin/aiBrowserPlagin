@@ -9,10 +9,16 @@ export default defineManifest({
   description: pkg.description,
   version: pkg.version || "0.0.0",
 
-  // Popup UI (Phase 1). Side panel is added in Phase 2.
+  // Popup UI (Phase 1). Side panel (Stage 6) reuses the exact same HTML page —
+  // no duplicated logic; CSS makes the layout work in both fixed-320px popup and
+  // variable-width side-panel contexts.
   action: {
     default_title: "AI Page Summarizer",
     default_popup: "src/popup/index.html",
+  },
+
+  side_panel: {
+    default_path: "src/popup/index.html",
   },
 
   background: {
@@ -33,6 +39,7 @@ export default defineManifest({
     "storage", // persist BYOK settings via chrome.storage
     "scripting", // programmatic injection fallback
     "contextMenus", // "Summarize selection" right-click entry (Stage 5)
+    "sidePanel", // Side Panel UI alongside the page (Stage 6)
   ],
 
   // The pdf.js worker is imported via Vite `?url` and emitted into assets/. MV3

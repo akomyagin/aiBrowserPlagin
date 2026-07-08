@@ -20,6 +20,8 @@ type OnMessageListener = (
 
 let onInstalledListener: () => void;
 let onMessageListener: OnMessageListener;
+// Widened to the fields the tests assert on; the full stub has more.
+let sidePanelStub: { setPanelBehavior: ReturnType<typeof vi.fn> };
 
 // Deferred: capture the AbortSignal handed to fetch and never resolve, so the
 // request stays "in flight" and cancellation is observable.
@@ -46,6 +48,9 @@ beforeEach(async () => {
       create: vi.fn(),
       onClicked: { addListener: vi.fn() },
     },
+    sidePanel: {
+      setPanelBehavior: vi.fn(async () => undefined),
+    },
     storage: {
       local: {
         get: vi.fn(async () => ({})),
@@ -53,6 +58,7 @@ beforeEach(async () => {
       },
     },
   };
+  sidePanelStub = chromeStub.sidePanel;
   vi.stubGlobal("chrome", chromeStub);
 
   // A key must be present so callLLM proceeds to fetch; loadSettings falls back
@@ -172,5 +178,12 @@ describe("background onMessage", () => {
 
   it("onInstalled listener fires without throwing", () => {
     expect(() => onInstalledListener()).not.toThrow();
+  });
+
+  it("onInstalled sets the side panel behavior to not open on action click", () => {
+    onInstalledListener();
+    expect(sidePanelStub.setPanelBehavior).toHaveBeenCalledWith({
+      openPanelOnActionClick: false,
+    });
   });
 });

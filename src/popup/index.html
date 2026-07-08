@@ -5,10 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Page Summarizer</title>
     <style>
+      /* Fixed 320px in the popup; fluid in the side panel where the user can
+         resize the width. min-width keeps the popup from collapsing narrower
+         than its designed layout. */
       body {
-        width: 320px;
+        min-width: 320px;
+        max-width: 100%;
         margin: 0;
         padding: 12px;
+        box-sizing: border-box;
         font-family: system-ui, sans-serif;
         font-size: 14px;
       }

@@ -33,6 +33,9 @@ chrome.runtime.onInstalled.addListener(() => {
     title: "Summarize selection",
     contexts: ["selection"],
   });
+  // Stage 6: keep the popup as the default action-click behavior. The side panel
+  // (same HTML page) is opened manually by the user via Chrome's side-panel icon.
+  void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
 });
 
 // Right-click "Summarize selection". An MV3 background worker cannot open the

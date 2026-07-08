@@ -50,6 +50,9 @@ beforeEach(async () => {
         }),
       },
     },
+    sidePanel: {
+      setPanelBehavior: vi.fn(async () => undefined),
+    },
     tabs: { sendMessage: sendMessageSpy },
     storage: {
       local: {
