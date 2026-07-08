@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import { crx } from "@crxjs/vite-plugin";
 import manifest from "./manifest.config.ts";
 
@@ -11,5 +11,9 @@ export default defineConfig({
     // Extensions load unbundled from dist/; keep output deterministic.
     outDir: "dist",
     emptyOutDir: true,
+  },
+  test: {
+    environment: "jsdom",
+    include: ["src/**/*.test.ts"],
   },
 });

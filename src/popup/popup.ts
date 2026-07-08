@@ -17,6 +17,7 @@ import type {
 } from "../lib/messages.ts";
 
 const button = document.getElementById("summarize") as HTMLButtonElement;
+const status = document.getElementById("status") as HTMLDivElement;
 const output = document.getElementById("summary") as HTMLDivElement;
 
 button.addEventListener("click", () => {
@@ -24,31 +25,55 @@ button.addEventListener("click", () => {
 });
 
 async function handleSummarize(): Promise<void> {
-  output.textContent = "Extracting…";
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab.id) {
-    output.textContent = "No active tab.";
-    return;
+  button.disabled = true;
+  status.textContent = "Extracting…";
+  output.textContent = "";
+  output.classList.remove("muted");
+
+  try {
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    if (!tab.id) {
+      status.textContent = "";
+      output.textContent = "No active tab.";
+      return;
+    }
+
+    const extractReq: ExtractRequest = { type: "EXTRACT", source: "page" };
+    const extracted = (await chrome.tabs.sendMessage(
+      tab.id,
+      extractReq,
+    )) as ExtractResult;
+
+    status.textContent = "Summarizing…";
+
+    const summarizeReq: SummarizeRequest = {
+      type: "SUMMARIZE",
+      source: "page",
+      text: extracted.text,
+      url: extracted.url,
+      title: extracted.title,
+    };
+    const result = (await chrome.runtime.sendMessage(
+      summarizeReq,
+    )) as SummarizeResult;
+
+    status.textContent = "";
+    output.textContent = result.ok
+      ? (result.summary ?? "")
+      : `Error: ${result.error}`;
+  } catch (err: unknown) {
+    status.textContent = "";
+    const msg = err instanceof Error ? err.message : String(err);
+    const isMissingContentScript =
+      msg.includes("Could not establish connection") ||
+      msg.includes("Receiving end does not exist");
+    output.textContent = isMissingContentScript
+      ? "This extension cannot summarize browser pages (chrome://, about:, extension pages)."
+      : `Error: ${msg}`;
+  } finally {
+    button.disabled = false;
   }
-
-  const extractReq: ExtractRequest = { type: "EXTRACT", source: "page" };
-  const extracted = (await chrome.tabs.sendMessage(
-    tab.id,
-    extractReq,
-  )) as ExtractResult;
-
-  const summarizeReq: SummarizeRequest = {
-    type: "SUMMARIZE",
-    source: "page",
-    text: extracted.text,
-    url: extracted.url,
-    title: extracted.title,
-  };
-  const result = (await chrome.runtime.sendMessage(
-    summarizeReq,
-  )) as SummarizeResult;
-
-  output.textContent = result.ok
-    ? (result.summary ?? "")
-    : `Error: ${result.error}`;
 }
