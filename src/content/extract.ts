@@ -35,7 +35,7 @@ export function extractPageLinks(): PageLink[] {
     seen.add(href);
     links.push({ text, href });
   });
-  return links.slice(0, 30); // cap at 30 to fit token budget
+  return links.slice(0, 60); // cap at 60 (~3 KB at avg 50 chars/link, fits token budget)
 }
 
 // Extract readable main content via Readability, stripping nav/ads/boilerplate.

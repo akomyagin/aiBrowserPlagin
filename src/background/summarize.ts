@@ -52,11 +52,12 @@ export function httpErrorMessage(status: number, statusText: string): string {
 }
 
 const SYSTEM_PROMPT =
-  "You are a helpful assistant. Summarize the web page content concisely " +
-  "(3-5 bullet points or 2-3 short paragraphs). Respond in the same language " +
-  "as the content. When summarizing pages that list articles or posts, include " +
-  "the relevant URL as a Markdown link [title](url) using the URLs provided in " +
-  "'Links on this page'. Only link to URLs that were explicitly provided.";
+  "You are a helpful assistant. Respond in the same language as the content.\n\n" +
+  "— If the page is a SINGLE article or document: summarize it in 3-5 concise bullet points.\n" +
+  "— If the page is a LIST of articles, posts, or items (feed, digest, top, news): " +
+  "produce one bullet per item covering ALL items on the page — do not skip any. " +
+  "Format each bullet as: • [Article title](url) — one-sentence description. " +
+  "Use the URLs provided in 'Links on this page'; only link to URLs explicitly provided there.";
 
 /**
  * Call an OpenAI-compatible /chat/completions endpoint and return the summary.
